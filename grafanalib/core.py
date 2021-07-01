@@ -401,6 +401,9 @@ class Target(object):
     instant = attr.ib(validator=instance_of(bool), default=False)
     datasource = attr.ib(default=None)
 
+    rawSql = attr.ib(default=None)
+    rawQuery = attr.ib(default=None)
+
     def to_json_data(self):
         return {
             'expr': self.expr,
@@ -415,6 +418,8 @@ class Target(object):
             'step': self.step,
             'instant': self.instant,
             'datasource': self.datasource,
+            'rawSql': self.rawSql,
+            'rawQuery': self.rawQuery,
         }
 
 
@@ -1332,8 +1337,7 @@ class Graph(Panel):
     thresholds = attr.ib(default=attr.Factory(list))
     xAxis = attr.ib(default=attr.Factory(XAxis), validator=instance_of(XAxis))
 
-    rawSql = attr.ib(default=None)
-    rawQuery = attr.ib(default=None)
+
 
     # XXX: This isn't a *good* default, rather it's the default Grafana uses.
     try:
@@ -1378,8 +1382,6 @@ class Graph(Panel):
             'type': GRAPH_TYPE,
             'xaxis': self.xAxis,
             'yaxes': self.yAxes,
-            'rawSql': self.rawSql,
-            'rawQuery': self.rawQuery,
         }
         if self.alert:
             graphObject['alert'] = self.alert
