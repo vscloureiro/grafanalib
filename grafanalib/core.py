@@ -577,10 +577,10 @@ class GridPos(object):
     :param y: y cordinate of the panel, in same unit as h
     """
 
-    h = attr.ib()
-    w = attr.ib()
-    x = attr.ib()
-    y = attr.ib()
+    h = attr.ib(default=0)
+    w = attr.ib(default=0)
+    x = attr.ib(default=0)
+    y = attr.ib(default=0)
 
     def to_json_data(self):
         return {
@@ -1225,8 +1225,9 @@ class RowPanel(Panel):
     :param title: title of the panel
     :param panels: list of panels in the row
     """
-
+    title = attr.ib(default=None)
     panels = attr.ib(default=attr.Factory(list), validator=instance_of(list))
+    showTitle = attr.ib(default=None)
 
     def _iter_panels(self):
         return iter(self.panels)
@@ -1236,11 +1237,20 @@ class RowPanel(Panel):
         return attr.evolve(self, panels=list(map(f, self.panels)))
 
     def to_json_data(self):
+        showTitle = False
+        title = "New row"
+        if self.title is not None:
+            showTitle = True
+            title = self.title
+        if self.showTitle is not None:
+            showTitle = self.showTitle
         return self.panel_json(
             {
+                'title': title,
                 'collapsed': False,
                 'panels': self.panels,
-                'type': ROW_TYPE
+                'type': ROW_TYPE,
+				'showTitle': showTitle
             }
         )
 
@@ -1510,7 +1520,7 @@ class Text(Panel):
 
 
 @attr.s
-class AlertList(object):
+class AlertList(Panel):
     """Generates the AlertList Panel.
 
     :param dashboardTags: A list of tags (strings) for the panel.
