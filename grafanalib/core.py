@@ -477,7 +477,16 @@ class YAxis(object):
     """A single Y axis.
 
     Grafana graphs have two Y axes: one on the left and one on the right.
+
+    :param decimals: Defines how many decimals are displayed for Y value. (default auto)
+    :param format: The display unit for the Y value
+    :param label: The Y axis label. (default “")
+    :param logBase: The scale to use for the Y value, linear, or logarithmic. (default linear)
+    :param max: The maximum Y value
+    :param min: The minimum Y value
+    :param show: Show or hide the axis
     """
+
     decimals = attr.ib(default=None)
     format = attr.ib(default=None)
     label = attr.ib(default=None)
@@ -1136,6 +1145,20 @@ class Dashboard(object):
         }
 
 
+def _deep_update(base_dict, extra_dict):
+    if extra_dict is None:
+        return base_dict
+
+    for k, v in extra_dict.items():
+        if k in base_dict and hasattr(base_dict[k], "to_json_data"):
+            base_dict[k] = base_dict[k].to_json_data()
+
+        if k in base_dict and isinstance(base_dict[k], dict):
+            _deep_update(base_dict[k], v)
+        else:
+            base_dict[k] = v
+
+
 @attr.s
 class Panel(object):
     """
@@ -1160,6 +1183,8 @@ class Panel(object):
     :param title: of the panel
     :param transparent: defines if panel should be transparent
     :param transformations: defines transformations applied to the table
+    :param extraJson: raw JSON additions or overrides added to the JSON output
+           of this panel, can be used for using unsupported features
     """
 
     dataSource = attr.ib(default=None)
@@ -1183,6 +1208,7 @@ class Panel(object):
     timeShift = attr.ib(default=None)
     transparent = attr.ib(default=False, validator=instance_of(bool))
     transformations = attr.ib(default=attr.Factory(list), validator=instance_of(list))
+    extraJson = attr.ib(default=None, validator=attr.validators.optional(instance_of(dict)))
 
     def _map_panels(self, f):
         return f(self)
@@ -1214,6 +1240,7 @@ class Panel(object):
             'transformations': self.transformations
         }
         res.update(overrides)
+        _deep_update(res, self.extraJson)
         return res
 
 
@@ -1311,19 +1338,30 @@ class Graph(Panel):
     Generates Graph panel json structure.
 
     :param alert: List of AlertConditions
+    :param align: Select to align left and right Y-axes by value
+    :param alignLevel: Available when Align is selected. Value to use for alignment of left and right Y-axes
+    :param bars: Display values as a bar chart
     :param dataLinks: List of data links hooked to datapoints on the graph
-    :param dataSource: DataSource's name
-    :param minSpan: Minimum width for each panel
+    :param fill: Area fill, amount of color fill for a series. (default 1, 0 is none)
+    :param fillGradient: Degree of gradient on the area fill. (0 is no gradient, 10 is a steep gradient. Default is 0.)
+    :param lines: Display values as a line graph
+    :param points: Display points for values (default False)
+    :param pointRadius: Controls how large the points are
+    :param stack: Each series is stacked on top of another
+    :param percentage: Available when Stack is selected. Each series is drawn as a percentage of the total of all series
     :param thresholds: List of GraphThresholds - Only valid when alert not defined
     """
 
     alert = attr.ib(default=None)
     alertThreshold = attr.ib(default=True, validator=instance_of(bool))
     aliasColors = attr.ib(default=attr.Factory(dict))
+    align = attr.ib(default=False, validator=instance_of(bool))
+    alignLevel = attr.ib(default=0, validator=instance_of(int))
     bars = attr.ib(default=False, validator=instance_of(bool))
     dataLinks = attr.ib(default=attr.Factory(list))
     error = attr.ib(default=False, validator=instance_of(bool))
     fill = attr.ib(default=1, validator=instance_of(int))
+    fillGradient = attr.ib(default=0, validator=instance_of(int))
     grid = attr.ib(default=attr.Factory(Grid), validator=instance_of(Grid))
     isNew = attr.ib(default=True, validator=instance_of(bool))
     legend = attr.ib(
@@ -1346,8 +1384,6 @@ class Graph(Panel):
     )
     thresholds = attr.ib(default=attr.Factory(list))
     xAxis = attr.ib(default=attr.Factory(XAxis), validator=instance_of(XAxis))
-
-
 
     # XXX: This isn't a *good* default, rather it's the default Grafana uses.
     try:
@@ -1392,6 +1428,10 @@ class Graph(Panel):
             'type': GRAPH_TYPE,
             'xaxis': self.xAxis,
             'yaxes': self.yAxes,
+            'yaxis': {
+                'align': self.align,
+                'alignLevel': self.alignLevel
+            }
         }
         if self.alert:
             graphObject['alert'] = self.alert
@@ -2515,8 +2555,10 @@ class PieChart(Panel):
     :param aliasColors: dictionary of color overrides
     :param format: defines value units
     :param pieType: defines the shape of the pie chart (pie or donut)
+    :param percentageDecimals: Number of decimal places to show if percentages shown in legned
     :param showLegend: defines if the legend should be shown
     :param showLegendValues: defines if the legend should show values
+    :param showLegendPercentage: Show percentages in the legend
     :param legendType: defines where the legend position
     :param thresholds: defines thresholds
     """
@@ -2525,8 +2567,10 @@ class PieChart(Panel):
     format = attr.ib(default='none')
     legendType = attr.ib(default='Right side')
     pieType = attr.ib(default='pie')
+    percentageDecimals = attr.ib(default=0, validator=instance_of(int))
     showLegend = attr.ib(default=True)
     showLegendValues = attr.ib(default=True)
+    showLegendPercentage = attr.ib(default=False, validator=instance_of(bool))
     thresholds = attr.ib(default="")
 
     def to_json_data(self):
@@ -2544,7 +2588,9 @@ class PieChart(Panel):
                 },
                 'legend': {
                     'show': self.showLegend,
-                    'values': self.showLegendValues
+                    'values': self.showLegendValues,
+                    'percentage': self.showLegendPercentage,
+                    'percentageDecimals': self.percentageDecimals
                 },
                 'legendType': self.legendType,
                 'type': PIE_CHART_TYPE,
